@@ -18,21 +18,20 @@ package com.minio.photoapiservice;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.io.IOException;
 import java.security.NoSuchAlgorithmException;
 import java.security.InvalidKeyException;
 
-import org.json.JSONArray;
 import org.xmlpull.v1.XmlPullParserException;
 
+import io.minio.GetPresignedObjectUrlArgs;
+import io.minio.ListObjectsArgs;
 import io.minio.MinioClient;
 import io.minio.Result;
-import io.minio.messages.Bucket;
 import io.minio.messages.Item;
 import io.minio.errors.MinioException;
+import io.minio.http.Method;
 
 public class AlbumDao {
     public List<Album> listAlbums() throws NoSuchAlgorithmException,
@@ -41,13 +40,15 @@ public class AlbumDao {
         List<Album> list = new ArrayList<Album>();
         final String minioBucket = "albums";
 
-        // Initialize minio client object.
-        MinioClient minioClient = new MinioClient("play.minio.io", 9000,
-                                                  "Q3AM3UQ867SPQQA43P2F",
-                                                  "zuf+tfteSlswRu7BJ86wekitnifILbZam1KYY3TG");
+        MinioClient minioClient =
+        	    MinioClient.builder()
+        	        .endpoint("https://play.min.io")
+        	        .credentials("Q3AM3UQ867SPQQA43P2F", "zuf+tfteSlswRu7BJ86wekitnifILbZam1KYY3TG")
+        	        .build();
 
         // List all objects.
-        Iterable<Result<Item>> myObjects = minioClient.listObjects(minioBucket);
+        Iterable<Result<Item>> myObjects = minioClient.listObjects(
+        	    ListObjectsArgs.builder().bucket(minioBucket).build());
 
         // Iterate over each elements and set album url.
         for (Result<Item> result : myObjects) {
@@ -55,7 +56,14 @@ public class AlbumDao {
             System.out.println(item.lastModified() + ", " + item.size() + ", " + item.objectName());
 
             // Generate a presigned URL which expires in a day
-            url = minioClient.presignedGetObject(minioBucket, item.objectName(), 60 * 60 * 24);
+            String url =
+            	    minioClient.getPresignedObjectUrl(
+            	        GetPresignedObjectUrlArgs.builder()
+            	            .method(Method.GET)
+            	            .bucket(minioBucket)
+            	            .object(item.objectName())
+            	            .expiry(24, TimeUnit.HOURS)
+            	            .build()); 
              
             // Create a new Album Object
             Album album = new Album();
